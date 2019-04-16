@@ -8,8 +8,14 @@
 # Base nationale de données sur les feux de forêt du Canada (BNDFFC)
 # http://cwfis.cfs.nrcan.gc.ca/datamart/download/nfdbpoly?token=c74594b75b0157c6ca2590e27976ff90
 
-# Insectes 
+# Insectes
 # http://mffp.gouv.qc.ca/le-ministere/acces-aux-donnees-gratuites/
+
+# Interventions forestières
+# https://www.donneesquebec.ca/recherche/fr/dataset/recolte-et-reboisement
+
+# Perturbations autres
+# https://www.donneesquebec.ca/recherche/fr/dataset/epidemies-chablis-et-verglas
 
 ### PACKAGES ####
 
@@ -49,16 +55,16 @@ fire <- st_read("raw_data/feux/NFDB_poly/", "NFDB_poly_20171106")
 
 ### Insect data ####
 
-arpenteuse <- st_read("raw_data/insectes/Arpenteuse/Arpenteuse_donnees_1991_2012/", 
+arpenteuse <- st_read("raw_data/insectes/Arpenteuse/Arpenteuse_donnees_1991_2012/",
                       "Arpenteuse_donnees_1991_2012")
 
-livree <- st_read("raw_data/insectes/Livree/", 
+livree <- st_read("raw_data/insectes/Livree/",
                   "Livree_1985_2010")
 
-tordeuse1 <- st_read("raw_data/insectes/TBE/TBE_Donnees_1992-2006/", 
+tordeuse1 <- st_read("raw_data/insectes/TBE/TBE_Donnees_1992-2006/",
                      "TBE_1992_2006")
 
-tordeuse2 <- st_read("raw_data/insectes/TBE/TBE_Donnees_2007-2013/", 
+tordeuse2 <- st_read("raw_data/insectes/TBE/TBE_Donnees_2007-2013/",
                      "TBE_2007_2013")
 
 
@@ -115,25 +121,25 @@ which(!st_is(interv_fores,  "MULTIPOLYGON"))
 
 ### SAVE VALID GPKG ####
 
-st_write(fire, "raw_data/feux/NFDB_poly_20171106_valid.gpkg", 
+st_write(fire, "raw_data/feux/NFDB_poly_20171106_valid.gpkg",
          driver="GPKG")
 
-st_write(arpenteuse, "raw_data/insectes/insect_valid/Arpenteuse_donnees_1991_2012_valid.gpkg", 
+st_write(arpenteuse, "raw_data/insectes/insect_valid/Arpenteuse_donnees_1991_2012_valid.gpkg",
          driver="GPKG")
 
-st_write(livree, "raw_data/insectes/insect_valid/Livree_1985_2010_valid.gpkg", 
+st_write(livree, "raw_data/insectes/insect_valid/Livree_1985_2010_valid.gpkg",
          driver="GPKG")
 
 st_write(tordeuse1, "raw_data/insectes/insect_valid/TBE_1992_2006_valid.gpkg",
          driver="GPKG")
 
-st_write(tordeuse2, "raw_data/insectes/insect_valid/TBE_2007_2013_valid.gpkg", 
+st_write(tordeuse2, "raw_data/insectes/insect_valid/TBE_2007_2013_valid.gpkg",
          driver="GPKG")
 
-st_write(pertu_autre, "raw_data/pertu/pertu_autre_valid.gpkp", 
+st_write(pertu_autre, "raw_data/pertu/pertu_autre_valid.gpkp",
          driver = "GPKG")
 
-st_write(interv_fores, "raw_data/pertu/interv_fores_valid.gpkg", 
+st_write(interv_fores, "raw_data/pertu/interv_fores_valid.gpkg",
          driver = "GPKG")
 
 
@@ -233,17 +239,17 @@ plot_insect <- plot_insect %>% arrange(plot_id)
 ### Disturbances ####
 
 
-plot_pertu <- plot_pertu %>% 
-  select(ID_PE, plot_id, ORIGINE, AN_ORIGINE, PERTURB, AN_PERTURB) %>% 
-  arrange(plot_id) %>% 
+plot_pertu <- plot_pertu %>%
+  select(ID_PE, plot_id, ORIGINE, AN_ORIGINE, PERTURB, AN_PERTURB) %>%
+  arrange(plot_id) %>%
   mutate(disturbance = "pertu_autre")
 
 plot_pertu$AN_ORIGINE <- as.integer(as.character(plot_pertu$AN_ORIGINE))
 plot_pertu$AN_PERTURB <- as.integer(as.character(plot_pertu$AN_PERTURB))
 
-plot_interv <- plot_interv %>% 
-  select(ID_PE, plot_id, ORIGINE, AN_ORIGINE, PERTURB, AN_PERTURB, starts_with("REB")) %>% 
-  arrange(plot_id) %>% 
+plot_interv <- plot_interv %>%
+  select(ID_PE, plot_id, ORIGINE, AN_ORIGINE, PERTURB, AN_PERTURB, starts_with("REB")) %>%
+  arrange(plot_id) %>%
   mutate(disturbance = "interv_fores")
 
 plot_interv$AN_ORIGINE <- as.integer(as.character(plot_interv$AN_ORIGINE))
@@ -252,35 +258,33 @@ plot_interv$AN_PERTURB <- as.integer(as.character(plot_interv$AN_PERTURB))
 
 plot_pertu_interv <- bind_rows(plot_pertu, plot_interv)
 
-plot_pertu_interv <- plot_pertu_interv %>% 
+plot_pertu_interv <- plot_pertu_interv %>%
   arrange(plot_id)
 
 # fire
 
-plot_fire <- plot_fire %>% 
-  dplyr::select(ID_PE, plot_id, FIRE_ID, YEAR, DECADE, SIZE_HA, CAUSE) %>% 
+plot_fire <- plot_fire %>%
+  dplyr::select(ID_PE, plot_id, FIRE_ID, YEAR, DECADE, SIZE_HA, CAUSE) %>%
   arrange(plot_id)
 
 
 # everything together
 
-colnames(plot_fire) <- c("ID_PE", "plot_id", "FIRE_ID", 
+colnames(plot_fire) <- c("ID_PE", "plot_id", "FIRE_ID",
                          "FIRE_YEAR", "FIRE_DECADE", "FIRE_HA", "FIRE_CAUSE")
 
-colnames(plot_insect) <- c("ID_PE", "plot_id", "INSECT_ANNEE", "INSECT_HA", 
+colnames(plot_insect) <- c("ID_PE", "plot_id", "INSECT_ANNEE", "INSECT_HA",
                            "INSECT_NIVEAU", "INSECT")
 plot_insect <- plot_insect[,c("ID_PE", "plot_id", "INSECT", "INSECT_ANNEE", "INSECT_HA", "INSECT_NIVEAU")]
 
 
 
-plot_disturb <- xy32198 %>% 
+plot_disturb <- xy32198 %>%
   full_join(plot_fire, by = c("ID_PE", "plot_id")) %>%
-  full_join(plot_insect, by = c("ID_PE", "plot_id")) %>% 
+  full_join(plot_insect, by = c("ID_PE", "plot_id")) %>%
   full_join(plot_pertu_interv, by = c("ID_PE", "plot_id")) %>%
   arrange(plot_id) %>% st_set_geometry(NULL)
 
 saveRDS(plot_disturb, "data/plot_disturb.RDS")
 
-# YEAH! 
-
-
+# YEAH!
