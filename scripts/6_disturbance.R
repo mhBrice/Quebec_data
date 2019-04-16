@@ -32,15 +32,6 @@ require(dplyr)
 
 ### DATA ####
 
-path_data <- "/Users/mariehbrice/Documents/GitHub/Doctorat/data/"
-
-path_feux <- "/Users/mariehbrice/Documents/Université/Doctorat/QC_forests_project/spatial_data/feux/"
-
-path_insectes <- "/Users/mariehbrice/Documents/Université/Doctorat/QC_forests_project/spatial_data/insectes/"
-
-path_pertu <- "/Users/mariehbrice/Documents/Université/Doctorat/QC_forests_project/spatial_data/perturbation_intervention/"
-
-
 #### Coordinate data ####
 
 xy32198 <- st_read("data/plot_xy32198_may2018.gpkg")
@@ -49,8 +40,6 @@ xy32198 <- st_read("data/plot_xy32198_may2018.gpkg")
 ### Fire data ####
 
 fire <- st_read("raw_data/feux/NFDB_poly/", "NFDB_poly_20171106")
-#fireQc <- readOGR(paste0(path_feux, "Feux_cont_simp/SHP/"), "FEUX_CONT_SIMP_1972_2016")
-
 
 
 ### Insect data ####

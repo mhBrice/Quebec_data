@@ -21,13 +21,7 @@ require(sf)
 require(lwgeom)
 require(dplyr)
 
-## PATH
-
-path_data <- "/Users/mariehbrice/Documents/Université/Doctorat/QC_forests_project/spatial_data/"
-
-path_species <- "/Users/mariehbrice/Documents/GitHub/Doctorat/data/species/"
-
-path_env <- "/Users/mariehbrice/Documents/GitHub/Doctorat/data/env/"
+## DATA ####
 
 ### Formatted species data with xy coordinates
 
