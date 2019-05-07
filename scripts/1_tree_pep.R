@@ -382,15 +382,16 @@ plot_xy <- right_join(plot_xy, unique(tree_data[,c("ID_PE", "plot_id")]), by = "
 #### Reshape - site x species matrix ####
 
 sp_mat <- dcast(tree_data, ID_PE + ID_PE_MES + plot_id + year_measured ~ sp_code, 
-               #subset = .(state == "alive"), 
+               subset = .(state == "alive"), 
                fun.aggregate = length,
                fill = 0, 
                value.var = "DHP")
 sp_mat[,"NA"] <- NULL
 
+# remove NA when computing basal area (to keep all stems of a species that where measured)
 sp_BA <- dcast(tree_data, ID_PE + ID_PE_MES + plot_id + year_measured ~ sp_code, 
-              fun.aggregate = function(x) sum(pi*(x/(2 * 1000))^2)*(10000/399.7312),
-              #subset = .(state == "alive"), 
+              fun.aggregate = function(x) sum(pi*(x/(2 * 1000))^2, na.rm = T)*(10000/399.7312),
+              subset = .(state == "alive"), 
               fill = 0, 
               value.var = "DHP")
 sp_BA[,"NA"] <- NULL
@@ -408,8 +409,8 @@ saveRDS(tree_data, "data/tree_data_may2018.RDS")
 
 saveRDS(growth, "data/growth_data_may2018.RDS")
 
-saveRDS(sp_mat, "data/sp_mat_abun_fev2019.RDS")
-saveRDS(sp_BA, "data/sp_mat_ba_fev2019.RDS")
+saveRDS(sp_mat, "data/sp_mat_abun_jul2018.RDS")
+saveRDS(sp_BA, "data/sp_mat_ba_jul2018.RDS")
 
 st_write(plot_xy, "data/plot_xy32198_may2018.gpkg", layer_options = "OVERWRITE=yes")
 
