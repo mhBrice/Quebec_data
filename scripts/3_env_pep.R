@@ -25,20 +25,20 @@ require(dplyr)
 
 ### Formatted species data with xy coordinates
 
-tree_data <- readRDS("data/tree_data_may2018.RDS")
+tree_data <- readRDS("data/tree_data_nov2019.RDS")
 
 # check the list of layers in the gdb
 
-ogrListLayers("data_raw/Pep/PEP.gdb")
+ogrListLayers("raw_data/PEP_GDB/PEP.gdb")
 
 # Layer containing soil variables (humus, texture, ph)
-pep_sol <- st_read("data_raw/Pep/PEP.gdb", layer = "STATION_SOL")
+pep_sol <- st_read("raw_data/PEP_GDB/PEP.gdb", layer = "STATION_SOL")
 
 # Layer containing disturbance variables and drainage
-pep_pe <- st_read("data_raw/Pep/PEP.gdb", layer = "STATION_PE")
+pep_pe <- st_read("raw_data/PEP_GDB/PEP.gdb", layer = "STATION_PE")
 
 # Layer containing age of selected trees in all PE MES
-pep_arb <- st_read("data_raw/Pep/PEP.gdb", layer = "DENDRO_ARBRES_ETUDES")
+pep_arb <- st_read("raw_data/PEP_GDB/PEP.gdb", layer = "DENDRO_ARBRES_ETUDES")
 
 # For soil type, take the measurements for each PEP MES (humus type, organic matter depth, sometimes vary through year mainly because of disturbances)
 # For analysis, we could decide to take only the last measurements or the mean (for quantitative variable)
@@ -55,7 +55,7 @@ apply(pep_arb, 2, function(x) length(which(complete.cases(x))) / nrow(pep_arb) *
 
 # SOIL VARIABLES
 pep_sol <- pep_sol %>%
-  select(ID_PE, ID_PE_MES, TYPEHUMUS, EPMATORG, PH_HUMUS, POURCPIERR)
+  select(ID_PE, ID_PE_MES, TYPEHUMUS, EPMATORG, PH_HUMUS,PH_HORIZB, POURCPIERR)
 
 # DISTURBANCE VARIABLES
 pep_pe <- pep_pe %>%
@@ -79,8 +79,7 @@ age_data <- tree_data %>%
 
 ### RECLASSIFY VARIABLES ####
 
-table(pep_pe$ORIGINE) # 3766 plots with coupe total
-# ignore FR (friche)
+table(pep_pe$ORIGINE) # 3965 plots with coupe total
 # ORIGINE => Les perturbations naturelles et les interventions anthropiques d’origine qui ont éliminé plus de 75 % de la surface terrière du peuplement précédent
 
 
@@ -96,13 +95,15 @@ env_data <- env_data %>%
                               CL_DRAI %in% c(60:64) ~ "tres_mauvais"))
 env_data$CL_DRAI2 <- as.factor(env_data$CL_DRAI2)
 
+
 ## PERTURBATION D'ORIGINE
 env_data <- env_data %>%
   mutate(ORIGINE2 = case_when(ORIGINE == "BR" ~ "burn",
                               ORIGINE %in% c("CBA", "CBT", "CPR", "CT") ~ "logging",
                               ORIGINE %in% c("CHT","DT") ~ "windfall", # DT = dépérissement
                               ORIGINE %in% c("P", "PLN", "PLR", "ENS") ~ "plantation",
-                              ORIGINE == "ES" ~ "severe_outbreak"))
+                              ORIGINE == "ES" ~ "severe_outbreak",
+                              ORIGINE == "FR" ~ "wasteland"))
 env_data$ORIGINE2 <- as.factor(env_data$ORIGINE2)
 
 ## PERTURBATION PARTIELLE
@@ -122,7 +123,18 @@ age_data <- age_data %>%
 
 env_data <- env_data %>% left_join(age_data, by = "ID_PE_MES")
 
+# Order and select last soil measures
+
+env_data <- env_data %>% 
+  select(ID_PE:year_measured, 
+         ORIGINE:PERTURB, 
+         ORIGINE2:PERTURB2, age_mean,
+         TYPEHUMUS:CL_DRAI, CL_DRAI2) %>%
+  group_by(plot_id) %>%
+  arrange(year_measured, .by_group = TRUE) %>% 
+  mutate_at(vars(TYPEHUMUS:CL_DRAI2), last)
+
 ### SAVE ####
 
-saveRDS(env_data, "data/env_data_may2018.RDS")
+saveRDS(env_data, "data/env_data_nov2019.RDS")
 

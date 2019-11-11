@@ -58,10 +58,10 @@ st_write(ecoregion_simple, "data/ecoregion_simple.gpkg", driver = "GPKG",
 ### ASSIGN PLOTS TO ECOREGION ####
 
 #### Assigning each sample to the region where it belongs ####
-plot_xy <- st_read("data/plot_xy32198_may2018.gpkg")
+plot_xy <- st_read("data/plot_xy32198_nov2019.gpkg")
 
 xy_assign_reg <- st_intersection(plot_xy, ecoregion) %>% 
-  distinct()
+  distinct(plot_id, .keep_all = TRUE)
 
 mapview::mapview(xy_assign_reg, zcol="SOUS_DOM6")
 
@@ -85,7 +85,7 @@ ecoreg_df <- xy_assign_reg %>%
   distinct() %>% 
   rename(ecoreg11 = SOUS_DOM11, ecoreg6 = SOUS_DOM6, ecoreg3 = SOUS_DOM3)
 
-saveRDS(ecoreg_df, "data/ecoreg_df.RDS")
+saveRDS(ecoreg_df, "data/ecoreg_df_nov19.RDS")
 
 
 ### QUEBEC BOUNDARY ####
