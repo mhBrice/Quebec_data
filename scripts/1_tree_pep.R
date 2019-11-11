@@ -2,8 +2,9 @@
 
 # The geodatabase containing the PEP tree data (placette-échantillon permanente) is available online at https://www.donneesquebec.ca/recherche/fr/dataset/placettes-echantillons-permanentes-1970-a-aujourd-hui
 
-# download.file("ftp://ftp.mffp.gouv.qc.ca/Public/DGIF_Diffusion/Foret/DONNEES_FOR_ECO_SUD/Placettes_permanentes/PEP_GDB.zip", destfile = "raw_data/PEP.zip")
-# unzip("raw_data/PEP.zip", exdir = path_data)
+# download.file("ftp://transfert.mffp.gouv.qc.ca/Public/Diffusion/DonneeGratuite/Foret/DONNEES_FOR_ECO_SUD/Placettes_permanentes/PEP_GDB.zip", destfile = "raw_data/PEP.zip")
+
+# unzip("raw_data/PEP.zip", exdir = "raw_data")
 # database downloaded on May the 24th 2018
 
 # Steps for data cleaning
@@ -26,57 +27,72 @@ library(plyr)
 ### READ GDB LAYERS ####
 
 # Check the list of layers in the gdb
-ogrListLayers("raw_data/Pep/PEP.gdb")
+ogrListLayers("raw_data/PEP_GDB/PEP.gdb")
 
 # Plot coordinates
-plot_xy <- st_read("raw_data/Pep/PEP.gdb", layer = "PLACETTE")
+plot_xy <- st_read("raw_data/PEP_GDB/PEP.gdb", layer = "PLACETTE")
 
 # Plot date of measurements
-plot_mes1 <- st_read("raw_data/Pep/PEP.gdb", layer = "PLACETTE_MES")
+plot_mes <- st_read("raw_data/PEP_GDB/PEP.gdb", layer = "PLACETTE_MES")
 
 # DHP + cote DENDRO_ARBRES
-tree_mes <- st_read("raw_data/Pep/PEP.gdb", layer = "DENDRO_ARBRES")
+tree_mes <- st_read("raw_data/PEP_GDB/PEP.gdb", layer = "DENDRO_ARBRES")
 
 which(duplicated(plot_xy$ID_PE))
 
 # Disturbances
-pep_pe <- st_read("raw_data/Pep/PEP.gdb", layer = "STATION_PE")
+pep_pe <- st_read("raw_data/PEP_GDB/PEP.gdb", layer = "STATION_PE")
 
 # Species code
 sps_code <- read.csv2("raw_data/ref_spCode.csv")
 
 ### DATA CLEANING ####
 
-# Keep only necessary columns
+# Keep only necessary columns 
+# Remove abandonned plots (STATUT_MES %in% c(AB, RE, RL, DE, NT, SR))
 
-plot_xy <- plot_xy %>%
-  dplyr::select(ID_PE, SHAPE) 
+table(plot_mes$STATUT_MES)
+ID_PE_aband <- plot_mes %>% filter(!is.na(STATUT_MES))
 
 plot_mes <- plot_mes %>%
+  filter(!(ID_PE %in% ID_PE_aband$ID_PE)) %>%
   mutate(year_measured = as.integer(format(DATE_SOND, format="%Y"))) %>%
   dplyr::select(ID_PE, ID_PE_MES, year_measured) 
 
+plot_xy <- plot_xy %>%
+  filter(ID_PE %in% plot_mes1$ID_PE) %>%
+  dplyr::select(ID_PE, SHAPE) 
+
 tree_mes <- tree_mes %>%
-  dplyr::select(-c(NO_MES, IN_ESS_NC, IN_1410, DEFOL_MIN, CL_QUAL:PRIO_RECOL, STADE_DEGR:VMB_HA)) 
-
-
-length(which(!(plot_mes$ID_PE_MES %in% unique(tree_mes$ID_PE_MES))))
-# 775 PE_MES are missing from tree_data... most of which were abandonned or relocalised
-
-
+  filter(ID_PE %in% plot_mes1$ID_PE) %>%
+  dplyr::select(-c(NO_MES, IN_ESS_NC, IN_1410, DEFOL_MIN, 
+                   CL_QUAL:PRIO_RECOL, STADE_DEGR:VMB_HA))
 ### Change species code
 
 tree_mes$sp_code <- sps_code$spCode[match(tree_mes$ESSENCE, sps_code$qc_code)]
 
 
+length(which(!(plot_mes$ID_PE_MES %in% unique(tree_mes$ID_PE_MES))))
+# 534 PE_MES are missing from tree_data...
+missing_ID <- plot_mes %>% filter(!(ID_PE_MES %in% tree_mes$ID_PE_MES))
+pert <- pep_pe %>% filter(ID_PE %in% missing_ID$ID_PE)
+pert2 <- pert %>% group_by(ID_PE) %>% filter(all(is.na(ORIGINE)))
+length(unique(pert2$ID_PE))
+# all, but 11 ID_PE, were highly disturbed hence no tree
+# Remove the 11 ID_PE for which we cannot explain the absence of tree
+
 # Merge with plot info
 
-tree_data <- plot_mes %>% 
-  #full_join(plot_xy, by = "ID_PE") %>%
-  right_join(tree_mes, by = c("ID_PE", "ID_PE_MES"))
+tree_data0 <- plot_mes %>% filter(!(ID_PE %in% pert2$ID_PE)) %>%
+  left_join(tree_mes, by = c("ID_PE", "ID_PE_MES"))
+
+added_ID <- tree_data0 %>% filter(!(ID_PE_MES %in% tree_mes$ID_PE_MES))
+
+levels(tree_data0$ETAT) <- c(levels(tree_data0$ETAT),"AllDead")
+tree_data0$ETAT[tree_data0$ID_PE_MES %in% added_ID$ID_PE_MES] <- "AllDead"
 
 # Recode plot id, tree id
-tree_data <- tree_data %>%
+tree_data <- tree_data0 %>%
   mutate(plot_id = as.integer(as.factor(ID_PE))) %>%
   mutate(tree_id = as.integer(ID_ARBRE)) %>%
   mutate(NO_ARBRE = as.integer(as.character(NO_ARBRE))) %>%
@@ -90,19 +106,19 @@ tree_data <- tree_data %>% filter(!ETAT %in% c("GV","GM","GA")) %>%
   
 ### REMOVE SOME STATES ####
 # Remove etat == 25 (intru), 44, 45, 46 (dead recruit), 34, 35, 36 (dead forgotten)
-
+rm <- tree_data$tree_id[tree_data$ETAT %in% c(25,44,45,46,34,35,36)]
 tree_data <- tree_data %>% 
-  group_by(tree_id) %>% 
-  filter(!any(ETAT %in% c(25,44,45,46,34,35,36))) 
+  filter(!(tree_id %in% rm)) 
 
 ### RESURECTED SPECIES
 
 dead_state <- c(14,16,23,24,26,44,46,54,55,56)
 live_state <- c(10,12,30,32,40,42,50,52)
 
+dead_id <- tree_data$tree_id[tree_data$ETAT %in% dead_state]
 dead <- tree_data %>% 
+  filter(tree_id %in% dead_id) %>%
   group_by(tree_id) %>%
-  filter(any(ETAT %in% dead_state)) %>%
   arrange(year_measured) %>%
   slice(-(1:min(which(ETAT %in% dead_state)))) # remove all rows before dead state by tree id
 
@@ -112,53 +128,54 @@ dead <- tree_data %>%
 
 ### RESURECTION 
 # then look if there are still living state in dead2
-resurected <- dead %>% subset(ETAT %in% live_state, tree_id)
+resurected <- dead %>% subset(ETAT %in% live_state)
+length(unique(resurected$ID_ARBRE))
+#384 resurections = mainly renumbering mistakes because disturbances
 
+# Only correct those that are new recruits (caused by disturbances)
+# Remove the others
+resur_recru <- resurected %>% group_by(ID_ARBRE) %>% filter(any(ETAT==40))
+resur_rm <- resurected %>% filter(!(ID_ARBRE %in% resur_recru$ID_ARBRE))
+# resur_many <- resurected %>% filter(ID_PE_MES %in% names(which(table(resurected$ID_PE_MES)>3)))
+# match(resur_many$ID_PE, resur_recru$ID_PE)
+# match(resur_recru$ID_PE, resur_many$ID_PE)
 
-for(id in unique(resurected$tree_id)) { # loop over resurected trees
+tree_data <- tree_data %>% filter(!(ID_ARBRE %in% resur_rm$ID_ARBRE))
+
+for(id in unique(resur_recru$tree_id)) { # loop over resurected trees
   tmp <- subset(tree_data, tree_id==id)
   tmp_p <- subset(tree_data, plot_id==unique(tmp$plot_id))
   d <- which(tmp$ETAT %in% dead_state) # lines where dead
   l <- which(tmp$ETAT %in% live_state) # lines where alive
   if(any(min(d)<l)) { # if alive after death
     # change tree no for the last no + 1 in this plot
-    tmp$NO_ARBRE[l[min(which(l>min(d)))]:nrow(tmp)] <- (max(tmp_p$NO_ARBRE)+1) 
+    tmp$NO_ARBRE[l[min(which(l>min(d)))]:nrow(tmp)] <- (max(tmp_p$NO_ARBRE, na.rm = TRUE)+1) 
   }
-  tree_data$NO_ARBRE[tree_data$tree_id==id] <- tmp$NO_ARBRE
-
+  tree_data$NO_ARBRE[which(tree_data$tree_id==id)] <- tmp$NO_ARBRE
 }
+
+
+#### 2 x DEAD - Remove tree once it's dead
+dead2 <- dead %>% filter(!(tree_id %in% resurected$tree_id))
+
+tree_data <- tree_data %>% filter(!(ID_ARB_MES %in% dead2$ID_ARB_MES))
 
 #### Create unique tree ids again
 fac <- with(tree_data, paste(tree_data$plot_id, tree_data$NO_ARBRE))
 tree_data <- within(tree_data, tree_id <- match(fac, unique(fac)))
 
-#### 2 x DEAD
-
-dead <- tree_data %>% 
-  group_by(tree_id) %>%
-  filter(any(ETAT %in% dead_state)) %>%
-  arrange(year_measured) %>%
-  slice(-(1:min(which(ETAT %in% dead_state)))) # remove all rows before dead state by tree id
-
-dead2x_id <- which(tree_data$ID_ARB_MES %in% dead$ID_ARB_MES)
-
-tree_data <- (tree_data[-dead2x_id,])
-
 
 ### CORRECTIONS OF TREE IDS #####
 
+
 ### Are all tree_id associated with only one species? 
 
-tree_id_verif <- tree_data %>%
-  dplyr::select(tree_id, sp_code) %>%
-  filter(!is.na(sp_code)) %>%
-  group_by(tree_id) %>%
-  summarise(freq = length(unique(sp_code)))
+tree_id_verif <- table(tree_data$tree_id, tree_data$sp_code)
+tree_id_verif[tree_id_verif>0] <-1
+length(which(rowSums(tree_id_verif)>1))/nrow(tree_id_verif)
+# 6318 ->  0.9% d'erreur
 
-length(which(tree_id_verif$freq > 1))
-# 6417 -> 6417/695146 = 0.9% d'erreur
-
-dupli_tree_id <- subset(tree_id_verif, freq > 1)$tree_id 
+dupli_tree_id <- unique(tree_data$tree_id)[which(rowSums(tree_id_verif)>1)]
 dupli_plot_id <- subset(tree_data, tree_id %in% dupli_tree_id) 
 ### NOPE - some tree ids are associated with more than one species; most seem like identification mistakes but some are from a bad renumbering
 
@@ -167,7 +184,7 @@ last_sp_code <- tree_data[tree_data$tree_id %in% dupli_tree_id,] %>%
   group_by(tree_id) %>% 
   filter(!is.na(sp_code)) %>%
   top_n(1, year_measured) %>%
-  select(sp_code)
+  select(tree_id, sp_code)
 
 for(id in last_sp_code$tree_id) {
   tree_data$sp_code[which(tree_data$tree_id == id)] <- last_sp_code$sp_code[last_sp_code$tree_id==id]
@@ -176,24 +193,30 @@ for(id in last_sp_code$tree_id) {
 ### Remove trees with missing info #### 
 # is.na(sp_code) & is.na(ETAT) & is.na(DHP)
 
-tree_data <- tree_data[-with(tree_data, which(is.na(sp_code) & is.na(ETAT) & is.na(DHP))),]
+miss_info <- tree_data[with(tree_data, which(is.na(sp_code) & is.na(ETAT) & is.na(DHP))),]
+table(miss_info$ID_PE)
+# Remove ID_PE == 7209501402 -> problem with the data
+tree_data <- tree_data %>% filter(!(ID_PE %in% "7209501402"))
+tree_data <- tree_data %>% filter(!(tree_id %in% miss_info$tree_id))
 
+tree_data2 = tree_data
 ### Add sp_code to ID_ARB_MES that have NAs (either dead or 29) ####
 na_sp_code <- subset(tree_data, is.na(sp_code))
 
 new_sp_code <- subset(tree_data, tree_id %in% na_sp_code$tree_id) %>% 
-  group_by(tree_id) %>% slice(1L)
+  group_by(tree_id) %>% slice(1L) #%>% filter(!is.na(sp_code))
 
+tree_data <- tree_data %>% group_by(tree_id) %>%
+  dplyr::mutate(sp_code2 = dplyr::first(sp_code)) 
 
-for(id in new_sp_code$tree_id) {
-  tree_data$sp_code[tree_data$tree_id == id & is.na(tree_data$sp_code)] <- new_sp_code$sp_code[new_sp_code$tree_id == id]
-} 
+tree_data <- tree_data[-with(tree_data, which(is.na(sp_code2) & ETAT != "AllDead")),]
 
+tree_data2=tree_data
 # remaining NAs are species that were dead the first time they were inventoried
 
 
 #### Manage ETAT == 29  ####
-#(renumbered trees because non-identifiable or forked)
+#(non-identifiable or forked trees)
 
 # which PEP MES contains ETAT=29
 pepmes29 <- unique(subset(tree_data, ETAT == 29)$ID_PE_MES)
@@ -237,51 +260,52 @@ tree_29_nodisturb <- tree_29_nodisturb[-which(tree_29_nodisturb$ID_ARB_MES %in% 
 tree_data$state[which(tree_data$ID_ARB_MES %in% tree_29_nodisturb$ID_ARB_MES)] <- "unknown"
 
 # if ETAT==29 and ETAT==54,55,56 (renumbered and dead) in the plot -> try to match
-tree29 <- tree_data[which(tree_data$ETAT==29),]
-tree54 <- tree_data[which(tree_data$ETAT %in% c(54,55,56)),]
+# tree29 <- tree_data[which(tree_data$ETAT==29),]
+# tree54 <- tree_data[which(tree_data$ETAT %in% c(54,55,56)),]
+# 
+# tree2954 <- subset(tree_data, ID_PE_MES %in% tree29$ID_PE_MES & ID_PE_MES %in% tree54$ID_PE_MES)
 
-tree2954 <- subset(tree_data, ID_PE_MES %in% tree29$ID_PE_MES & ID_PE_MES %in% tree54$ID_PE_MES)
 
-for(p in unique(tree2954$ID_PE_MES)) {
-  tmp <- subset(tree2954, ID_PE_MES==p)
-  
-  tmp29 <- tmp[tmp$ETAT == 29,]
-  tmp5x <- tmp[tmp$ETAT %in% c(54,55,56),]
-  
-  species <- intersect(unique(tmp5x$sp_code),unique(tmp29$sp_code))
-  
-  # if no species in common
-  if(length(species)==0) { tmp$state[tmp$ID_ARB_MES %in% c(tmp_sp29$ID_ARB_MES,tmp_sp5x$ID_ARB_MES)] <- "unknown"
-  } else {
-    for(sp in species) {
-      tmp_sp29 <- tmp29[tmp29$sp_code==sp,]
-      tmp_sp5x <- tmp5x[tmp5x$sp_code==sp,]
-      
-      l29 <- length(tmp_sp29$tree_id)
-      l5x <- length(tmp_sp5x$tree_id)
-      n <- min(l29, l5x)
-      
-      # match id
-      for(i in 1:n) { 
-        tree_data$tree_id[which(tree_data$tree_id %in% tmp_sp5x$tree_id[i])] <- tmp_sp29$tree_id[i]
-        tree_data <- tree_data[-which(tree_data$ID_ARB_MES %in% tmp_sp29$ID_ARB_MES[i]),]  
-        # DHP non comparable
-        tree_data$DHP_NC[which(tree_data$ID_ARB_MES %in% tmp_sp5x$ID_ARB_MES[i])] <- "NC"
-        }
-      
-      # unknown for the rest
-      if(n < l29) { tree_data$state[which(tree_data$ID_ARB_MES %in% tmp_sp29$ID_ARB_MES[(n+1):l29])] <- "unknown" }
-      if(n < l5x) { tree_data$state[which(tree_data$ID_ARB_MES %in% tmp_sp5x$ID_ARB_MES[(n+1):l5x])] <- "unknown" }
-    }
-  }
-}
+# for(p in unique(tree2954$ID_PE_MES)) {
+#   tmp <- subset(tree2954, ID_PE_MES==p)
+#   
+#   tmp29 <- tmp[tmp$ETAT == 29,]
+#   tmp5x <- tmp[tmp$ETAT %in% c(54,55,56),]
+#   
+#   species <- intersect(unique(tmp5x$sp_code),unique(tmp29$sp_code))
+#   
+#   # if no species in common
+#   if(length(species)==0) { tmp$state[tmp$ID_ARB_MES %in% c(tmp_sp29$ID_ARB_MES,tmp_sp5x$ID_ARB_MES)] <- "unknown"
+#   } else {
+#     for(sp in species) {
+#       tmp_sp29 <- tmp29[tmp29$sp_code==sp,]
+#       tmp_sp5x <- tmp5x[tmp5x$sp_code==sp,]
+#       
+#       l29 <- length(tmp_sp29$tree_id)
+#       l5x <- length(tmp_sp5x$tree_id)
+#       n <- min(l29, l5x)
+#       
+#       # match id
+#       for(i in 1:n) { 
+#         tree_data$tree_id[which(tree_data$tree_id %in% tmp_sp5x$tree_id[i])] <- tmp_sp29$tree_id[i]
+#         tree_data <- tree_data[-which(tree_data$ID_ARB_MES %in% tmp_sp29$ID_ARB_MES[i]),]  
+#         # DHP non comparable
+#         tree_data$DHP_NC[which(tree_data$ID_ARB_MES %in% tmp_sp5x$ID_ARB_MES[i])] <- "NC"
+#         }
+#       
+#       # unknown for the rest
+#       if(n < l29) { tree_data$state[which(tree_data$ID_ARB_MES %in% tmp_sp29$ID_ARB_MES[(n+1):l29])] <- "unknown" }
+#       if(n < l5x) { tree_data$state[which(tree_data$ID_ARB_MES %in% tmp_sp5x$ID_ARB_MES[(n+1):l5x])] <- "unknown" }
+#     }
+#   }
+# }
 
 
 # 3. For the rest of ETAT==29,5X assign the state unknown to the tree measure
 
 tree_data$state[which(tree_data$ETAT == 29)] <- "unknown"
-tree_data$state[which(tree_data$ETAT %in% c(50,52))] <- "unknown"
-tree_data$state[which(tree_data$ETAT %in% c(54,55,56) & is.na(tree_data$DHP_NC))] <- "unknown"
+tree_data$state[which(tree_data$ETAT %in% c(50,52))] <- "alive"
+tree_data$state[which(tree_data$ETAT %in% c(54,55,56))] <- "dead"
 
 
 
@@ -302,7 +326,7 @@ tree_data$state[which(tree_data$ETAT %in% c(14,15,16,23,24,54,55,56) & is.na(tre
 tree_data$state[which(is.na(tree_data$ETAT))] <- "unknown" 
 # maybe we should remove the ID_PE_MES with unknown states from analysis
 
-
+tree_data$state[which(tree_data$ETAT == "AllDead")] <- "dead" 
 
 #### ETAT == 23,24 -> state == "mechanical death"
 #tree_data$state[which(tree_data$ETAT %in% c(23,24))] <- "mechanical"
@@ -352,24 +376,28 @@ tree_data$DHP_NC[tree_data$ID_ARB_MES %in% subset(growth, DHP_NC=="negativeG")$I
 
 #### Check if some PE MES were deleted by mistake
 
-plot_mes_deleted <- setdiff(unique(tree_mes$ID_PE_MES), unique(tree_data$ID_PE_MES))
-# 875 PE MES were deleted because empty (no living mature trees)
+plot_mes_deleted <- setdiff(unique(tree_data0$ID_PE_MES), unique(tree_data$ID_PE_MES))
+# 545 PE MES were deleted because empty (no living mature trees)
+# except ID_PE == 7209501402 -> problem with the data
+
+plot_mes_deleted <- plot_mes_deleted[-grep("7209501402", plot_mes_deleted)]
+     
+plot_deleted <- tree_data0 %>% filter(ID_PE_MES %in% plot_mes_deleted) %>%
+  mutate(state = "AllDead") %>%
+  distinct(ID_PE, ID_PE_MES, year_measured, state)
 
 
 ### Add missing PE MES
-plot_mes_deleted <- data.frame(ID_PE_MES = plot_mes_deleted)
 
-tree_data <- plot_mes %>% # to get the year of sampling
-  right_join(plot_mes_deleted, by = "ID_PE_MES") %>%
-  mutate(state = "dead") %>%
-  bind_rows(tree_data) %>% 
-  group_by(ID_PE) %>% 
-  mutate(plot_id = ifelse(is.na(plot_id), unique(plot_id[complete.cases(plot_id)]), plot_id)) %>%
-  filter(!is.na(plot_id)) %>%
-  arrange(plot_id, tree_id)
+tree_data <- tree_data %>% 
+  bind_rows(plot_deleted) %>%
+  arrange(ID_PE, NO_ARBRE) %>% 
+  group_by(ID_PE) %>%
+  dplyr::mutate(plot_id = dplyr::first(plot_id))
 
-setdiff(unique(tree_mes$ID_PE_MES), unique(tree_data$ID_PE_MES)) 
-# still 105 PE MES missing but all the MES in the PE never contained living mature trees
+
+setdiff(unique(tree_data0$ID_PE_MES), unique(tree_data$ID_PE_MES)) 
+
 
 #### Join xy ####
 
@@ -381,20 +409,32 @@ plot_xy <- right_join(plot_xy, unique(tree_data[,c("ID_PE", "plot_id")]), by = "
   
 #### Reshape - site x species matrix ####
 
-sp_mat <- dcast(tree_data, ID_PE + ID_PE_MES + plot_id + year_measured ~ sp_code, 
-               subset = .(state == "alive"), 
+sp_mat <- reshape2::dcast(tree_data, ID_PE + ID_PE_MES + plot_id + year_measured ~ sp_code, 
+               subset = plyr::.(state == "alive"), 
                fun.aggregate = length,
                fill = 0, 
                value.var = "DHP")
-sp_mat[,"NA"] <- NULL
+
+add_rm <- subset(tree_data, !(ID_PE_MES %in% sp_mat$ID_PE_MES)) %>% 
+  distinct(ID_PE, ID_PE_MES, plot_id, year_measured)
+
+sp_mat <- sp_mat %>% bind_rows(add_rm) %>%
+  arrange(ID_PE, ID_PE_MES, year_measured)
+sp_mat[is.na(sp_mat)] <- 0
 
 # remove NA when computing basal area (to keep all stems of a species that where measured)
-sp_BA <- dcast(tree_data, ID_PE + ID_PE_MES + plot_id + year_measured ~ sp_code, 
+sp_BA <- reshape2::dcast(tree_data, ID_PE + ID_PE_MES + plot_id + year_measured ~ sp_code, 
               fun.aggregate = function(x) sum(pi*(x/(2 * 1000))^2, na.rm = T)*(10000/399.7312),
-              subset = .(state == "alive"), 
+              subset = plyr::.(state == "alive"), 
               fill = 0, 
               value.var = "DHP")
-sp_BA[,"NA"] <- NULL
+
+add_rm <- subset(tree_data, !(ID_PE_MES %in% sp_BA$ID_PE_MES)) %>% 
+  distinct(ID_PE, ID_PE_MES, plot_id, year_measured)
+
+sp_BA <- sp_BA %>% bind_rows(add_rm) %>%
+  arrange(ID_PE, ID_PE_MES, year_measured)
+sp_BA[is.na(sp_BA)] <- 0
 
 # tree_data$BA <- pi * (tree_data$DHP/(2 * 1000))^2
 # sp_BA2 <-dcast(tree_data, plot_id + year_measured ~ sp_code, 
@@ -405,12 +445,12 @@ sp_BA[,"NA"] <- NULL
 
 #### SAVE ####
 
-saveRDS(tree_data, "data/tree_data_may2018.RDS")
+saveRDS(tree_data, "data/tree_data_nov2019.RDS")
 
-saveRDS(growth, "data/growth_data_may2018.RDS")
+saveRDS(growth, "data/growth_data_nov2019.RDS")
 
-saveRDS(sp_mat, "data/sp_mat_abun_jul2018.RDS")
-saveRDS(sp_BA, "data/sp_mat_ba_jul2018.RDS")
+saveRDS(sp_mat, "data/sp_mat_abun_nov2019.RDS")
+saveRDS(sp_BA, "data/sp_mat_ba_nov2019.RDS")
 
-st_write(plot_xy, "data/plot_xy32198_may2018.gpkg", layer_options = "OVERWRITE=yes")
+st_write(plot_xy, "data/plot_xy32198_nov2019.gpkg", layer_options = "OVERWRITE=yes")
 
