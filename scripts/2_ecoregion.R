@@ -58,10 +58,10 @@ st_write(ecoregion_simple, "data/ecoregion_simple.gpkg", driver = "GPKG",
 ### ASSIGN PLOTS TO ECOREGION ####
 
 #### Assigning each sample to the region where it belongs ####
-plot_xy <- st_read("data/plot_xy32198_nov2019.gpkg")
+plot_xy <- st_read("data/plot_xy32198_oct2020.gpkg")
 
 xy_assign_reg <- st_intersection(plot_xy, ecoregion) %>% 
-  distinct(plot_id, .keep_all = TRUE)
+  distinct(ID_PE, .keep_all = TRUE)
 
 mapview::mapview(xy_assign_reg, zcol="SOUS_DOM6")
 
@@ -70,7 +70,7 @@ mapview::mapview(xy_assign_reg, zcol="SOUS_DOM6")
 
 
 xy_unassign <- plot_xy %>% 
-  filter(!(plot_id %in% xy_assign_reg$plot_id)) 
+  filter(!(ID_PE %in% xy_assign_reg$ID_PE)) 
 
 
 xy_unassign <- st_join(xy_unassign, ecoregion, join = st_nearest_feature)
@@ -78,14 +78,13 @@ xy_unassign <- st_join(xy_unassign, ecoregion, join = st_nearest_feature)
 mapview::mapview(xy_unassign, zcol="SOUS_DOM6")
 
 xy_assign_reg <- bind_rows(xy_assign_reg, xy_unassign) %>% 
-  arrange(plot_id) 
+  arrange(ID_PE) 
 
 ecoreg_df <- xy_assign_reg %>% 
   st_set_geometry(NULL) %>% 
-  distinct() %>% 
-  rename(ecoreg11 = SOUS_DOM11, ecoreg6 = SOUS_DOM6, ecoreg3 = SOUS_DOM3)
+  dplyr::rename(ecoreg11 = SOUS_DOM11, ecoreg6 = SOUS_DOM6, ecoreg3 = SOUS_DOM3)
 
-saveRDS(ecoreg_df, "data/ecoreg_df_nov19.RDS")
+saveRDS(ecoreg_df, "data/ecoreg_df_oct2020.RDS")
 
 
 ### QUEBEC BOUNDARY ####
