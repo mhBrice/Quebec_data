@@ -13,37 +13,35 @@
 
 ### PACKAGES ####
 
-require(rgdal)
-require(rgeos)
-require(data.table)
 require(sf)
-require(lwgeom)
 require(dplyr)
+require(tidyr)
+require(data.table)
+
+
 
 ## DATA ####
 
 ### Formatted species data with xy coordinates
 
-tree_data <- readRDS("data/tree_data_oct2020.RDS")
+tree_data <- readRDS("data/tree_data_fev2023.RDS")
 
-# check the list of layers in the gdb
+# check the list of layers in the gpkg
 
-ogrListLayers("raw_data/PEP_GDB/PEP.gdb")
+st_layers("raw_data/PEP_GPKG/PEP.gpkg")
 
 # Layer containing soil variables (humus, texture, ph)
-pep_sol <- st_read("raw_data/PEP_GDB/PEP.gdb", layer = "STATION_SOL")
+pep_sol <- st_read("raw_data/PEP_GPKG/PEP.gpkg", layer = "station_sol")
 
 # Layer containing disturbance variables and drainage
 ## Field data
-pep_pe <- st_read("raw_data/PEP_GDB/PEP.gdb", layer = "STATION_PE")
+pep_pe <- st_read("raw_data/PEP_GPKG/PEP.gpkg", layer = "station_pe")
 
-## photo-interpretation (better)
-pep_ori <- st_read("raw_data/PEP_GDB/PEP.gdb", layer = "PEE_ORI_SOND")
-
-
+## photo-interpretation (better for disturbances)
+pep_ori <- st_read("raw_data/PEP_GPKG/PEP.gpkg", layer = "pee_ori_sond")
 
 # Layer containing age of selected trees in all PE MES
-pep_arb <- st_read("raw_data/PEP_GDB/PEP.gdb", layer = "DENDRO_ARBRES_ETUDES")
+pep_arb <- st_read("raw_data/PEP_GPKG/PEP.gpkg", layer = "dendro_arbres_etudes")
 
 # For soil type, take the measurements for each PEP MES (humus type, organic matter depth, sometimes vary through year mainly because of disturbances)
 # For analysis, we could decide to take only the last measurements or the mean (for quantitative variable)
@@ -62,135 +60,129 @@ apply(pep_arb, 2, function(x) length(which(complete.cases(x))) / nrow(pep_arb) *
 
 # SOIL VARIABLES
 pep_sol <- pep_sol %>%
-  select(ID_PE, ID_PE_MES, TYPEHUMUS, EPMATORG, PH_HUMUS, PH_HORIZB, POURCPIERR)
+  select(id_pe, id_pe_mes, typehumus, epmatorg, ph_humus, ph_horizb, pourcpierr)
 
 # DISTURBANCE VARIABLES
 # field data
 pep_pe <- pep_pe %>%
-  select(ID_PE, ID_PE_MES, ORIGINE, PERTURB, CL_AGE,
-         CL_DRAI, ALTITUDE, VERSANT, PC_PENT, EXPOSITION, DEP_SUR, NATURE_DEP)
+  select(id_pe, id_pe_mes, origine, perturb, cl_age,
+         cl_drai, altitude, versant, pc_pent, exposition, dep_sur, nature_dep)
 # photo-interpretation data
 pep_ori <- pep_ori %>%
-  select(ID_PE, ID_PE_MES, ORIGINE, AN_ORIGINE, PERTURB, AN_PERTURB, CL_AGE,
-         CL_DRAI, DEP_SUR) %>%
-  rename_with(~paste0(., "_ori"), ORIGINE:DEP_SUR)
+  select(id_pe, id_pe_mes, origine, an_origine, perturb, an_perturb, cl_age,
+         cl_drai, dep_sur) %>%
+  rename_with(~paste0(., "_ori"), origine:dep_sur)
 
 
 # DISTURBANCE VARIABLES
 pep_arb <- pep_arb %>%
-  select(ID_PE, ID_PE_MES, ID_ARBRE, ID_ARB_MES, AGE)
+  select(id_pe, id_pe_mes, id_arbre, id_arb_mes, age)
 
 # XY
 
-pep_xy <- st_read("data/plot_xy32198_oct2020.gpkg")
+pep_xy <- st_read("data/pep_xy32198_fev2023.gpkg")
 
 ### JOIN VARIBALES ####
 
 env_data <- tree_data %>%
   ungroup() %>%
-  select(ID_PE, ID_PE_MES, year_measured) %>%
+  select(id_pe, id_pe_mes, year_measured) %>%
   distinct() %>%
-  left_join(pep_sol, by = c("ID_PE", "ID_PE_MES")) %>%
-  left_join(pep_pe, by = c("ID_PE", "ID_PE_MES")) %>%
-  left_join(pep_ori, by = c("ID_PE", "ID_PE_MES"))
+  left_join(pep_sol, by = c("id_pe", "id_pe_mes")) %>%
+  left_join(pep_pe, by = c("id_pe", "id_pe_mes")) %>%
+  left_join(pep_ori, by = c("id_pe", "id_pe_mes"))
 
 age_data <- tree_data %>%
-  select(ID_PE, ID_PE_MES, ID_ARBRE, ID_ARB_MES) %>%
-  left_join(pep_arb, by = c("ID_PE", "ID_PE_MES", "ID_ARBRE", "ID_ARB_MES"))
+  select(id_pe, id_pe_mes, id_arbre, id_arb_mes) %>%
+  left_join(pep_arb, by = c("id_pe", "id_pe_mes", "id_arbre", "id_arb_mes"))
 
 ### RECLASSIFY VARIABLES ####
 
-table(pep_pe$ORIGINE) # 3986 plots with coupe total
-# ORIGINE => Les perturbations naturelles et les interventions anthropiques d’origine qui ont éliminé plus de 75 % de la surface terrière du peuplement précédent
-table(pep_ori$ORIGINE)
+table(pep_pe$origine) # 4096 plots with coupe total
+table(pep_ori$origine_ori) # 4341 plots with coupe total
+# ORIGINE => perturbations naturelles et interventions anthropiques d’origine 
+# qui ont éliminé plus de 75 % de la surface terrière du peuplement précédent
 
 ## DRAINAGE
 env_data <- env_data %>%
-  mutate(CL_DRAI2 = case_when(CL_DRAI %in% 0 ~ "excessif",
-                              CL_DRAI %in% c(10:14) ~ "rapide",
-                              CL_DRAI == 16 ~ "complexe",
-                              CL_DRAI %in% c(20:24) ~ "bon",
-                              CL_DRAI %in% c(30:34) ~ "modere",
-                              CL_DRAI %in% c(40:44) ~ "imparfait",
-                              CL_DRAI %in% c(50:54) ~ "mauvais",
-                              CL_DRAI %in% c(60:64) ~ "tres_mauvais")) %>%
-  mutate(CL_DRAI_ori2 = case_when(CL_DRAI_ori %in% c(0, "00") ~ "excessif",
-                                  CL_DRAI_ori %in% c(10:14) ~ "rapide",
-                                  CL_DRAI_ori == 16 ~ "complexe",
-                                  CL_DRAI_ori %in% c(20:24) ~ "bon",
-                                  CL_DRAI_ori %in% c(30:34) ~ "modere",
-                                  CL_DRAI_ori %in% c(40:44) ~ "imparfait",
-                                  CL_DRAI_ori %in% c(50:54) ~ "mauvais",
-                                  CL_DRAI_ori %in% c(60:64) ~ "tres_mauvais"))
-env_data$CL_DRAI2 <- as.factor(env_data$CL_DRAI2)
-env_data$CL_DRAI_ori2 <- as.factor(env_data$CL_DRAI_ori2)
+  mutate(cl_drai2 = case_when(cl_drai %in% 0 ~ "excessif",
+                              cl_drai %in% c(10:14) ~ "rapide",
+                              cl_drai == 16 ~ "complexe",
+                              cl_drai %in% c(20:24) ~ "bon",
+                              cl_drai %in% c(30:34) ~ "modere",
+                              cl_drai %in% c(40:44) ~ "imparfait",
+                              cl_drai %in% c(50:54) ~ "mauvais",
+                              cl_drai %in% c(60:64) ~ "tres_mauvais")) %>%
+  mutate(cl_drai_ori2 = case_when(cl_drai_ori %in% c(0, "00") ~ "excessif",
+                                  cl_drai_ori %in% c(10:14) ~ "rapide",
+                                  cl_drai_ori == 16 ~ "complexe",
+                                  cl_drai_ori %in% c(20:24) ~ "bon",
+                                  cl_drai_ori %in% c(30:34) ~ "modere",
+                                  cl_drai_ori %in% c(40:44) ~ "imparfait",
+                                  cl_drai_ori %in% c(50:54) ~ "mauvais",
+                                  cl_drai_ori %in% c(60:64) ~ "tres_mauvais"))
+env_data$cl_drai2 <- as.factor(env_data$cl_drai2)
+env_data$cl_drai_ori2 <- as.factor(env_data$cl_drai_ori2)
 
 
 ## PERTURBATION D'ORIGINE
+logging <- c(
+  "CBA", "CBT", "CDV", "CEF",
+  "CPH", "CPR", "CPT", "CRB", "CRS",
+  "CS", "CT", "ETR", "RPS"
+)
 env_data <- env_data %>%
-  mutate(ORIGINE_ori2 = case_when(ORIGINE_ori == "BR" ~ "burn",
-                                  ORIGINE_ori %in% c("CBA", "CBT", "CDV", "CPH", "CPR", "CPT", "CRB", "CRS", "CS", "CT", "ETR", "RPS") ~ "logging",
-                                  ORIGINE_ori %in% c("CHT","DT") ~ "windfall", # DT = dépérissement
-                                  ORIGINE_ori %in% c("P", "PLN", "PLR", "ENS") ~ "plantation",
-                                  ORIGINE_ori == "ES" ~ "severe_outbreak",
-                                  ORIGINE_ori == "FR" ~ "wasteland"))
-env_data$ORIGINE_ori2 <- as.factor(env_data$ORIGINE_ori2)
+  mutate(origine_ori2 = case_when(origine_ori == "BR" ~ "burn",
+                                  origine_ori %in% logging ~ "logging",
+                                  origine_ori %in% c("CHT","DT") ~ "windfall", # DT = dépérissement
+                                  origine_ori %in% c("P", "PLN", "PLR", "PRR", "ENS", "REA") ~ "plantation",
+                                  origine_ori == "ES" ~ "severe_outbreak",
+                                  origine_ori == "FR" ~ "wasteland"))
+env_data$origine_ori2 <- as.factor(env_data$origine_ori2)
 
 ## PERTURBATION PARTIELLE
+partial_logging <- c(
+  "CA", "CAM", "CB", "CD", "CDL", "CE", "CEA", "CIP",
+  "CJ", "CJG", "CJP", "CJT",
+  "CP", "CPC", "CPF", "CPI", "CPM", "CPS", "CPX", "CTR",
+  "DEG", "DLD", "DRM", "EC", "ECE", "EPC", "ESI", "PCP"
+)
 env_data <- env_data %>%
-  mutate(PERTURB_ori2 = case_when(PERTURB_ori == "BRP" ~ "partial_burn",
-                                  PERTURB_ori %in% c("CA", "CAM", "CB","CD","CDL","CE", "CEA", "CIP", "CJ", "CJG", "CJP", "CJT", "CP", 'CPC', "CPF", "CPI", "CPM", "CPS", "CPX", "CTR", "DEG", "DLD", "DRM", "EC", "ECE", "EPC", "ESI", "PCP") ~
-                                "partial_logging",
-                                PERTURB_ori == "EL" ~ "light_outbreak",
-                                PERTURB_ori %in% c("CHP", "VEP", "DP") ~ "partial_windfall", # DP = dépérissement
-                                PERTURB_ori %in% c("ENR", "RR",  "RRG") ~ "partial_plantation")) 
-env_data$PERTURB_ori2 <- as.factor(env_data$PERTURB_ori2)
+  mutate(perturb_ori2 = case_when(perturb_ori == "BRP" ~ "partial_burn",
+                                  perturb_ori %in% partial_logging ~ "partial_logging",
+                                perturb_ori == "EL" ~ "light_outbreak",
+                                perturb_ori %in% c("CHP", "VEP", "DP") ~ "partial_windfall", # DP = dépérissement
+                                perturb_ori %in% c("ENR", "RR",  "RRG") ~ "partial_plantation")) 
+env_data$perturb_ori2 <- as.factor(env_data$perturb_ori2)
 
 ## AGE
 age_data <- age_data %>%
   ungroup() %>%
-  group_by(ID_PE_MES) %>%
-  dplyr::summarise(age_mean = mean(as.integer(AGE), na.rm = TRUE)) %>%
-  tidyr::replace_na(list(age_mean = NA))
+  group_by(id_pe_mes) %>%
+  summarise(age_mean = mean(as.integer(age), na.rm = TRUE)) %>%
+  replace_na(list(age_mean = NA))
 
-env_data <- env_data %>% left_join(age_data, by = "ID_PE_MES")
+env_data <- env_data %>% 
+  left_join(age_data, by = "id_pe_mes")
 
 # Order and select last soil measures
 
 env_data <- env_data %>% 
-  select(ID_PE:year_measured, 
-         ORIGINE_ori:AN_PERTURB_ori, ORIGINE_ori2, PERTURB_ori2,
-         ORIGINE:PERTURB, 
-         age_mean, CL_AGE,
-         TYPEHUMUS:POURCPIERR, CL_DRAI, CL_DRAI2, CL_DRAI_ori2, ALTITUDE:NATURE_DEP) 
+  select(id_pe:year_measured, 
+         origine_ori:an_perturb_ori, origine_ori2, perturb_ori2,
+         origine:perturb, 
+         age_mean, cl_age,
+         typehumus:pourcpierr, 
+         cl_drai, cl_drai2, cl_drai_ori2, 
+         altitude:nature_dep) 
 
 env_data <- env_data %>% 
-  group_by(ID_PE) %>%
+  group_by(id_pe) %>%
   arrange(year_measured, .by_group = TRUE) %>% 
-  mutate_at(vars(TYPEHUMUS:NATURE_DEP), last) %>%
+  mutate_at(vars(typehumus:nature_dep), last) %>%
   ungroup()
-
-### COMPLETE MISSING ALTITUDE ####
-alt_miss <- unique(env_data$ID_PE[which(is.na(env_data$ALTITUDE))])
-
-alt_xy <- pep_xy %>% 
-  filter(ID_PE %in% alt_miss) %>%
-  st_transform(crs = 4326) %>%
-  st_coordinates()
-
-# all in the same tile...
-
-alt_ras <- raster::getData("SRTM", lon = alt_xy[1,1], lat = alt_xy[1,2])
-
-alt <- raster::extract(alt_ras, alt_xy)
-
-for(i in 1:length(alt_miss)) {
-  env_data$ALTITUDE[which(env_data$ID_PE %in% alt_miss[i])] = alt[i]
-}
-
-  
 
 ### SAVE ####
 
-saveRDS(env_data, "data/env_data_oct2020.RDS")
+saveRDS(env_data, "data/env_data_fev2023.RDS")
 
