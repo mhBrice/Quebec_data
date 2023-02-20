@@ -1,0 +1,58 @@
+CODE;spCode;qc_code;VERNACULAR;complete name;dhp rank
+18032-ABI-BAL;ABIBAL;SAB;Balsam fir ;Abies balsamea;2
+18034-PIC-RUB;PICRUB;EPR;Red spruce ;Picea rubens;13
+183295-PIC-GLA;PICGLA;EPB;White spruce ;Picea glauca;8
+183302-PIC-MAR;PICMAR;EPN;Black spruce ;Picea mariana;1
+183319-PIN-BAN;PINBAN;PIG;Jack pine;Pinus banksiana;7
+183375-PIN-RES;PINRES;PIR;Red pine ;Pinus resinosa;25
+183385-PIN-STR;PINSTR;PIB;Eastern white pine ;Pinus strobus;12
+183397-TSU-CAN;TSUCAN;PRU;Eastern hemlock ;Tsuga canadensis;14
+183412-LAR-LAR;LARLAR;MEL;Tamarack ;Larix laricina;19
+19049-ULM-AME;ULMAME;ORA;American elm ;Ulmus americana;30
+19050-ULM-RUB;ULMRUB;ORT;Red elm;Ulmus rubra;49
+19059-ULM-THO;ULMTHO;ORR;Rock elm ;Ulmus thomasii;50
+19227-CAR-COR;CARCOR;CAC;Bitternut hickory ;Carya cordiformis;38
+19242-CAR-OVA;CAROVA;CAF;Shagbark hickory ;Carya ovata;52
+19250-JUG-CIN;JUGCIN;NOC;Butternut ;Juglans cinerea;41
+19287-QUE-MAC;QUEMAC;CHG;Bur oak;Quercus macrocarpa;40
+19290-QUE-ALB;QUEALB;CHB;White oak ;Quercus alba;35
+19300-QUE-BIC;QUEBIC;CHE;Swamp white oak ;Quercus bicolor;46
+19408-QUE-RUB;QUERUB;CHR;Red oak ;Quercus rubra;17
+19462-FAG-GRA;FAGGRA;HEG;American beech ;Fagus grandifolia;11
+19481-BET-ALL;BETALL;BOJ;Yellow birch ;Betula alleghaniensis;9
+19489-BET-PAP;BETPAP;BOP;White birch;Betula papyrifera;3
+19497-BET-POP;BETPOP;BOG;Grey birch;Betula populifolia;28
+19504-CAR-CAR;CARCAR;CAR;Blue beech ;Carpinus caroliniana;51
+19511-OST-VIR;OSTVIR;OSV;Ironwood ;Ostrya virginiana;22
+195773-POP-TRE;POPTRE;PET;Trembling aspen ;Populus tremuloides;6
+21536-TIL-AME;TILAME;TIL;Basswood ;Tilia americana;20
+22445-POP-DEL;POPDEL;PED;Cottonwood ;Populus deltoides;42
+22453-POP-BAL;POPBAL;PEB;Balsam poplar ;Populus balsamifera;21
+22463-POP-GRA;POPGRA;PEG;Large tooth aspen ;Populus grandidentata;15
+22476-SAL-NA;SALSP;SAL;Willow;Salix sp.;23
+24764-PRU-SER;PRUSER;CET;Black cherry ;Prunus serotina;29
+24799-PRU-PEN;PRUPEN;PRP;Pin cherry ;Prunus pensylvanica;16
+25319-SOR-AME;SORAME;SOA;American mountain-ash;Sorbus americana;24
+28728-ACE-RUB;ACERUB;ERR;Red maple;Acer rubrum;5
+28731-ACE-SAC;ACESAC;ERS;Sugar maple;Acer saccharum;4
+28754-ACE-PEN;ACEPEN;ERP;Striped maple;Acer pensylvanicum;27
+28757-ACE-SAC;ACERIN;ERA;Silver maple;Acer saccharinum;31
+28758-ACE-SPI;ACESPI;ERE;Mountain maple;Acer spicatum;33
+32929-FRA-PEN;FRAPEN;FRP;Red ash;Fraxinus pennsylvanica;36
+32931-FRA-AME;FRAAME;FRA;White ash ;Fraxinus americana;26
+32945-FRA-NIG;FRANIG;FRN;Black ash ;Fraxinus nigra;18
+505490-THU-OCC;THUOCC;THO;White cedar ;Thuja occidentalis;10
+25108-AME-NA;AMESP;AME;Serviceberry;Amelanchier sp.;45
+NA;ALNCRI;AUC;;Alnus crispa;56
+NA-ALN-RUG;ALNRUG;AUR;Speckled alder;Alnus incana subsp. rugosa;37
+19040-CEL-OCC;CELOCC;CEO;Hackberry ;Celtis occidentalis;54
+24539-CRA-NA;CRASP;CRA;Hawthorn;Crataegus sp.;53
+183289-PIC-ABI;PICABI;EPO;Norway spruce ;Picea abies;32
+28749-ACE-NEG;ACENEG;ERG;Manitoba maple;Acer negundo;55
+182135-ACE-NIG;ACENIG;ERN;Black maple;Acer nigrum;48
+25254-MAL-NA;MALSP;MAS;Crab apple;Malus sp.;44
+183376-PIN-RIG;PINRIG;PID;Pitch pine ;Pinus rigida;43
+183389-PIN-SYL;PINSYL;PIS;Scots pine ;Pinus sylvestris;34
+24806-PRU-VIR;PRUVIR;PRV;Chokecherry;Prunus virginiana;47
+25322-SOR-DEC;SORDEC;SOD;Northern mountain-ash;Sorbus decora;39
+NA;SORSP;SOR;Mountain-ash;Sorbus sp.;NA
