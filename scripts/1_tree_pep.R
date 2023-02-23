@@ -85,7 +85,7 @@ id_pe_aband <- pep_mes %>%
 
 pep_mes <- pep_mes %>%
   filter(!(id_pe %in% id_pe_aband$id_pe)) %>%
-  select(id_pe, id_pe_mes, year_measured)
+  select(id_pe, no_mes, id_pe_mes, year_measured)
 
 pep_xy <- pep_xy %>%
   filter(id_pe %in% pep_mes$id_pe) %>%
@@ -115,7 +115,7 @@ length(unique(pert2$id_pe))
 
 tree_data0 <- pep_mes %>%
   filter(!(id_pe %in% pert2$id_pe)) %>%
-  left_join(tree_mes, by = c("id_pe", "id_pe_mes"), multiple = "all")
+  left_join(tree_mes, by = c("id_pe", "no_mes", "id_pe_mes"), multiple = "all")
 
 added_id <- tree_data0 %>% filter(!(id_pe_mes %in% tree_mes$id_pe_mes))
 
@@ -370,7 +370,7 @@ pe_mes_deleted <- setdiff(unique(tree_data0$id_pe_mes), unique(tree_data$id_pe_m
 pe_deleted <- tree_data0 %>%
   filter(id_pe_mes %in% pe_mes_deleted) %>%
   mutate(state = "AllDead") %>%
-  distinct(id_pe, id_pe_mes, year_measured, state)
+  distinct(id_pe, no_mes, id_pe_mes, year_measured, state)
 
 
 ### Add missing PE MES
