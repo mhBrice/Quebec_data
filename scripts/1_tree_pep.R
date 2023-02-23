@@ -370,7 +370,7 @@ pe_mes_deleted <- setdiff(unique(tree_data0$id_pe_mes), unique(tree_data$id_pe_m
 pe_deleted <- tree_data0 %>%
   filter(id_pe_mes %in% pe_mes_deleted) %>%
   mutate(state = "AllDead") %>%
-  distinct(id_pe, id_pe_mes, year_measured, state)
+  distinct(id_pe, no_mes, id_pe_mes, year_measured, state)
 
 
 ### Add missing PE MES
