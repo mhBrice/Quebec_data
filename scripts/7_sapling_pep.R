@@ -1,78 +1,68 @@
 ### Formatting PEP tree data from Quebec ####
 
-# The geodatabase containing the PEP tree data (placette-échantillon permanente) is available online at https://www.donneesquebec.ca/recherche/fr/dataset/placettes-echantillons-permanentes-1970-a-aujourd-hui
+# The geopackage containing the PEP data (placette-échantillon permanente) is available online at
+# https://www.donneesquebec.ca/recherche/dataset/placettes-echantillons-permanentes-1970-a-aujourd-hui
 
-# download.file("ftp://transfert.mffp.gouv.qc.ca/Public/Diffusion/DonneeGratuite/Foret/DONNEES_FOR_ECO_SUD/Placettes_permanentes/PEP_GDB.zip", destfile = "raw_data/PEP.zip")
-
-# unzip("raw_data/PEP.zip", exdir = "raw_data")
-# database downloaded on May the 24th 2018
+# database downloaded on February, 1rst 2023
 
 ### PACKAGES ####
-library(rgdal)
 library(sf)
 library(dplyr)
 library(plyr)
 
+### READ DATA ####
 
-### READ GDB LAYERS ####
+# PEP coordinates
+pep_xy <- st_read("pep_xy32198_fev2023.gpkg")
 
-# Check the list of layers in the gdb
-ogrListLayers("raw_data/PEP_GDB/PEP.gdb")
+# PEP env data
+env_data <- readRDS("data/env_data_fev2023.RDS") %>%
+  select(id_pe, id_pe_mes, year_measured)
 
-# Plot coordinates
-plot_xy <- st_read("raw_data/PEP_GDB/PEP.gdb", layer = "PLACETTE")
 
-# Plot date of measurements
-plot_mes <- st_read("raw_data/PEP_GDB/PEP.gdb", layer = "PLACETTE_MES")
+# Check the list of layers in PEP.gpkg
+st_layers("raw_data/PEP_GPKG/PEP.gpkg")
 
 # DHP + cote DENDRO_ARBRES
-sap_mes <- st_read("raw_data/PEP_GDB/PEP.gdb", layer = "DENDRO_GAULES")
-
+sap_mes <- st_read("raw_data/PEP_GPKG/PEP.gpkg", layer = "dendro_gaules")
+seed_mes <- st_read("raw_data/PEP_GPKG/PEP.gpkg", layer = "station_semis")
 
 # Species code
 sps_code <- read.csv2("raw_data/ref_spCode.csv")
 
-# Remove abandonned plots (STATUT_MES %in% c(AB, RE, RL, DE, NT, SR))
-
-table(plot_mes$STATUT_MES)
-ID_PE_aband <- plot_mes %>% filter(!is.na(STATUT_MES))
-
-plot_mes <- plot_mes %>%
-  filter(!(ID_PE %in% ID_PE_aband$ID_PE)) %>%
-  mutate(year_measured = as.integer(format(DATE_SOND, format="%Y"))) %>%
-  dplyr::select(ID_PE, ID_PE_MES, year_measured) 
-
-plot_xy <- plot_xy %>%
-  filter(ID_PE %in% plot_mes$ID_PE) %>%
-  dplyr::select(ID_PE, SHAPE) 
-
+# Keep same PEP as in tree pep
 sap_mes <- sap_mes %>%
-  filter(ID_PE %in% plot_mes$ID_PE)
+  filter(id_pe %in% env_data$id_pe)
+
+seed_mes <- seed_mes %>%
+  filter(id_pe %in% env_data$id_pe)
 
 ### Change species code
+sap_mes$sp_code <- sps_code$spCode[match(sap_mes$essence, sps_code$qc_code)]
+seed_mes$sp_code <- sps_code$spCode[match(seed_mes$essence, sps_code$qc_code)]
 
-sap_mes$sp_code <- sps_code$spCode[match(sap_mes$ESSENCE, sps_code$qc_code)]
+# NOTE: NA in sp_code columns = not a tree species
 
-# Remove NA in sp_code columns (not a tree species)
+length(which(!(env_data$id_pe_mes %in% unique(sap_mes$id_pe_mes))))
+# 3969 PE_MES are missing from sap_mes
 
+# add missing pe_mes
 sap_mes <- sap_mes %>% 
-  filter(!is.na(sp_code)) %>%
-  arrange(ID_PE_MES)
+  right_join(env_data, by = c("id_pe", "id_pe_mes")) %>% 
+  select(id_pe, id_pe_mes, year_measured, sp_code, cl_dhp, nb_tige)
+sap_mes[which(is.na(sap_mes$sp_code)), "nb_tige"] <- 0
+sap_mes[which(is.na(sap_mes$sp_code)), "cl_dhp"] <- NA
 
-length(which(!(plot_mes$ID_PE_MES %in% unique(sap_mes$ID_PE_MES))))
-# 4028 PE_MES are missing from tree_data...
-missing_ID <- plot_mes %>% filter(!(ID_PE_MES %in% sap_mes$ID_PE_MES))
+length(which(!(env_data$id_pe_mes %in% unique(seed_mes$id_pe_mes))))
+# 26783 PE_MES are missing from seed_mes
+# add missing pe_mes
+seed_mes <- seed_mes %>% 
+  right_join(env_data, by = c("id_pe", "id_pe_mes")) %>% 
+  select(id_pe, id_pe_mes, micro_pe, year_measured, sp_code, cl_ht_semi)
 
-
-# NOTE - weird certaine PEP_MES sans saplings dans sap_mes mais reporté dans tree_mes
-# Reponse à moi-meme = pas de gaule dans la sous-placette
-
-sap_mes <- sap_mes %>% 
-  right_join(plot_mes, by = c("ID_PE", "ID_PE_MES")) %>% 
-  select(ID_PE, ID_PE_MES, year_measured, sp_code, CL_DHP, NB_TIGE)
-
-sap_mes[which(is.na(sap_mes$sp_code)), "NB_TIGE"] <- 0
+seed_mes[which(is.na(seed_mes$sp_code)), "cl_ht_semi"] <- NA
 
 # NOTE - on ne sait pas qui sont les nouvelles recrues d'un inventaire à l'aute...
 
-saveRDS(sap_mes, "data/sap_data_oct2020.RDS")
+saveRDS(sap_mes, "data/sap_data_fev2023.RDS")
+saveRDS(seed_mes, "data/seed_data_fev2023.RDS")
